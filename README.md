@@ -1,0 +1,332 @@
+# code-insight-engine
+
+**A high-performance, multi-language static analysis engine for code quality metrics.**
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Type checked: mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
+[![Linted: ruff](https://img.shields.io/badge/linted-ruff-red.svg)](https://github.com/astral-sh/ruff)
+[![Tests: pytest](https://img.shields.io/badge/tests-pytest-0A9EDC.svg)](https://pytest.org)
+
+`code-insight-engine` walks a codebase, parses each source file, and reports the metrics
+engineering teams actually use to gauge maintainability: lines of code, comment density,
+cyclomatic complexity, and structural counts (functions/classes) — broken down per file,
+per language, and rolled up project-wide, with automatic flagging of complexity "hotspots."
+
+It ships as both a **Python library** and a **CLI** (`code-insight`), and is designed to
+drop straight into CI pipelines via `--fail-on-hotspot` and machine-readable `--format json`
+output.
+
+---
+
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Key Features & Metrics](#key-features--metrics)
+- [Supported Languages](#supported-languages)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Programmatic API](#programmatic-api)
+- [Testing](#testing)
+- [Code Quality Standards](#code-quality-standards)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Architecture
+
+The engine is split into four independent, single-responsibility layers, so each can be
+tested, replaced, or extended in isolation:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                              CLI (click)                              │
+│                        code_insight.core.cli                         │
+│   Parses arguments → builds AnalysisConfig → orchestrates the run    │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼────────────────────────────────────┐
+│                   Configuration & Discovery                          │
+│                    code_insight.core.config                          │
+│  Language registry · exclude rules · recursive file walking          │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                 │  Path objects
+┌────────────────────────────────▼────────────────────────────────────┐
+│                        Parser (per file)                             │
+│                 code_insight.analyzers.parser                        │
+│  Python → exact `ast`-based analysis                                 │
+│  Other languages → lexical/regex-based analysis                      │
+│  Produces: FileMetrics (LOC, comments, complexity, functions/classes)│
+└───────────────────────────────┬─────────────────────────────────────┘
+                                 │  list[FileMetrics]
+┌────────────────────────────────▼────────────────────────────────────┐
+│                    Aggregation & Reporting                           │
+│                 code_insight.analyzers.metrics                       │
+│  Rolls up totals, per-language summaries, complexity hotspots        │
+│  Renders table / JSON / one-line summary output                      │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+**Design principles:**
+
+- **Fail soft, per file.** A syntax error or unreadable file never aborts the whole run —
+  it's captured on that file's `FileMetrics.error` and the rest of the analysis proceeds.
+- **Exact where possible, honest where not.** Python gets true AST-based cyclomatic
+  complexity (McCabe). Other languages get a clearly-labeled lexical heuristic rather than
+  a false claim of AST-level precision.
+- **Zero-dependency core.** The only runtime dependency is `click`. Table rendering, line
+  classification, and complexity scoring are all implemented directly against the standard
+  library.
+- **Library-first.** The CLI is a thin wrapper around a fully usable, type-hinted, importable
+  API (see [Programmatic API](#programmatic-api)).
+
+---
+
+## Key Features & Metrics
+
+| Metric | Description | Scope |
+|---|---|---|
+| **Lines of Code** | Total / code / comment / blank line counts | Per file, per language, project-wide |
+| **Comment Density** | `comment_lines / total_lines` | Per file, per language, project-wide average |
+| **Cyclomatic Complexity** | McCabe complexity (exact AST-based for Python; heuristic for other languages) | Per function (Python), per file, project-wide average |
+| **Function Count** | Number of function/method definitions | Per file, per language |
+| **Class Count** | Number of class/struct/interface definitions | Per file, per language |
+| **Complexity Hotspots** | Files at/above a configurable complexity threshold, ranked worst-first | Project-wide |
+| **Error Reporting** | Files that failed to parse (unreadable, unsupported, syntax error) with reason | Project-wide |
+
+## Supported Languages
+
+Python, JavaScript, TypeScript (`.ts`/`.tsx`), Java, C, C++, C#, Go, Rust, Ruby, PHP, Swift,
+and Kotlin are registered out of the box (`code_insight/core/config.py::LANGUAGE_REGISTRY`).
+Python is analyzed via the standard library `ast` module for exact results; all other
+languages use a dependency-free lexical analyzer. Adding a new language is a one-line
+addition to `LANGUAGE_REGISTRY`.
+
+---
+
+## Installation
+
+Requires Python 3.10+.
+
+```bash
+git clone https://github.com/datafactor/code-insight-engine.git
+cd code-insight-engine
+
+# Editable install for development
+pip install -e .
+
+# ...or with development tooling (pytest, mypy, ruff, black)
+pip install -e ".[dev]"
+```
+
+This registers the `code-insight` console script on your `PATH`.
+
+---
+
+## Usage
+
+### Basic analysis
+
+```bash
+code-insight analyze ./src
+```
+
+```
+======================================================================
+ CODE INSIGHT ENGINE - ANALYSIS REPORT
+======================================================================
+Files analyzed     : 11
+Total lines        : 1232
+Code lines         : 692
+Comment lines      : 321
+Blank lines        : 219
+Functions          : 43
+Classes            : 14
+Avg comment density: 39.5%
+Avg complexity     : 14.09
+
+----------------------------------------------------------------------
+ BY LANGUAGE
+----------------------------------------------------------------------
+Language         Files     Lines   Funcs  Classes  Complexity
+Python              11      1232      43       14         155
+
+----------------------------------------------------------------------
+ COMPLEXITY HOTSPOTS (threshold >= 10)
+----------------------------------------------------------------------
+  [  47] src/code_insight/analyzers/parser.py
+  [  43] src/code_insight/analyzers/metrics.py
+  [  28] src/code_insight/core/config.py
+  [  19] src/code_insight/core/cli.py
+======================================================================
+```
+
+### Filter by language
+
+```bash
+code-insight analyze . -l Python -l Go
+```
+
+### Exclude paths
+
+```bash
+code-insight analyze . -x 'tests/*' -x '*_generated.py'
+```
+
+### Machine-readable output (CI / tooling integration)
+
+```bash
+code-insight analyze . --format json --output report.json
+```
+
+### One-line summary (quick CI log line)
+
+```bash
+code-insight analyze . --format summary
+# → 11 files, 1232 lines, 43 functions, avg complexity 14.09, 4 hotspot(s) at threshold 10
+```
+
+### Gate a CI pipeline on complexity
+
+```bash
+code-insight analyze . --complexity-threshold 15 --fail-on-hotspot
+# exits with status code 2 if any file is at/above the threshold
+```
+
+### All options
+
+```bash
+code-insight analyze --help
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--recursive / --no-recursive` | Recurse into subdirectories | `--recursive` |
+| `-l, --language` | Restrict to language(s), repeatable | all registered languages |
+| `-x, --exclude` | Glob pattern to exclude, repeatable | `node_modules`, `.git`, `venv`, etc. always excluded |
+| `-f, --format` | `table`, `json`, or `summary` | `table` |
+| `-o, --output` | Write report to a file | stdout |
+| `-c, --complexity-threshold` | Hotspot flag threshold | `10` |
+| `--fail-on-hotspot` | Exit code `2` if hotspots found | off |
+| `-v, --verbose` | Debug-level logging | off |
+
+---
+
+## Programmatic API
+
+```python
+from code_insight import AnalysisConfig, CodeParser, MetricsAggregator
+from code_insight.analyzers.metrics import ReportFormatter
+
+config = AnalysisConfig(
+    target_path="./my_project",
+    languages=frozenset({"python"}),
+    complexity_threshold=12,
+)
+
+parser = CodeParser()
+file_metrics = [parser.parse_file(path) for path in config.discover_files()]
+
+project = MetricsAggregator().aggregate(file_metrics, config)
+
+print(ReportFormatter.format_summary(project))
+for hotspot in project.hotspots:
+    print(hotspot.file_path, hotspot.cyclomatic_complexity)
+```
+
+---
+
+## Testing
+
+The suite covers configuration/discovery, Python AST complexity scoring (including
+branch/loop/boolean-operator/exception edge cases), generic-language lexical analysis,
+aggregation, report formatting, and full CLI integration (via `click.testing.CliRunner`).
+
+```bash
+pip install -e ".[dev]"
+pytest                       # runs the full suite with coverage (see pyproject.toml)
+pytest --cov-report=html     # generates an HTML coverage report in htmlcov/
+pytest tests/test_parser.py  # run a single module
+```
+
+Coverage is enforced at **85%+** via `[tool.coverage.report] fail_under = 85` in
+`pyproject.toml`.
+
+---
+
+## Code Quality Standards
+
+- **Strict type hints** throughout (`from __future__ import annotations`, dataclasses,
+  `mypy --strict` clean — see `[tool.mypy]` in `pyproject.toml`).
+- **Comprehensive docstrings** (Google-style) on every public module, class, and function.
+- **Explicit exception hierarchy** (`CodeInsightError` and subclasses) instead of bare
+  exceptions, so callers can catch failures at the right granularity.
+- **Fail-soft parsing** — per-file errors are captured in `FileMetrics.error` rather than
+  crashing the whole run.
+- **Linting & formatting** via `ruff` and `black`, enforced in CI.
+- **No silent dependency creep** — one runtime dependency (`click`).
+
+Run the full local quality gate:
+
+```bash
+ruff check src tests
+mypy src
+pytest
+```
+
+---
+
+## Project Structure
+
+```
+code-insight-engine/
+├── pyproject.toml
+├── README.md
+├── LICENSE
+├── .gitignore
+├── .github/workflows/ci.yml
+├── src/
+│   └── code_insight/
+│       ├── __init__.py            # public API surface + version
+│       ├── __main__.py            # `python -m code_insight`
+│       ├── py.typed               # PEP 561 marker
+│       ├── core/
+│       │   ├── config.py          # language registry, AnalysisConfig, file discovery
+│       │   └── cli.py             # click CLI (`code-insight analyze ...`)
+│       ├── analyzers/
+│       │   ├── parser.py          # CodeParser: per-file metrics (LOC, complexity, etc.)
+│       │   └── metrics.py         # MetricsAggregator, ProjectMetrics, ReportFormatter
+│       └── utils/
+│           ├── exceptions.py      # CodeInsightError hierarchy
+│           └── logger.py          # colored console logging
+└── tests/
+    ├── conftest.py                # shared fixtures (sample multi-language project)
+    ├── test_config.py
+    ├── test_parser.py
+    ├── test_metrics.py
+    └── test_cli.py
+```
+
+---
+
+## Contributing
+
+1. Fork the repository and create a feature branch: `git checkout -b feature/my-change`.
+2. Install dev dependencies: `pip install -e ".[dev]"`.
+3. Write tests for any new behavior — coverage must stay at or above 85%.
+4. Ensure the quality gate passes locally: `ruff check src tests && mypy src && pytest`.
+5. Follow the existing docstring style (Google-style, one paragraph summary + `Args`/`Returns`/`Raises`).
+6. Open a pull request describing the change and its motivation.
+
+New language support only requires adding an entry to `LANGUAGE_REGISTRY` in
+`src/code_insight/core/config.py`; the discovery, comment-density, and generic-complexity
+logic apply automatically.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
