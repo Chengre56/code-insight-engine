@@ -46,7 +46,7 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -e ".[dev]"
-      - run: pip-audit || true
+      - run: pip-audit
 
   test:
     name: Test (py${{ matrix.python-version }})

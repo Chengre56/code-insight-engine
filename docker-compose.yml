@@ -1,0 +1,10 @@
+﻿services:
+  code-insight:
+    build: .
+    image: code-insight-engine:local
+    volumes:
+      - .:/workspace:ro
+    environment:
+      - CODE_INSIGHT_LOG_JSON=${CODE_INSIGHT_LOG_JSON:-0}
+      - CODE_INSIGHT_LOG_FILE=${CODE_INSIGHT_LOG_FILE:-}
+    command: ["analyze", "/workspace", "--format", "json"]
