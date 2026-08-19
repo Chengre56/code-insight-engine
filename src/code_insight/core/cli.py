@@ -76,10 +76,10 @@ def cli() -> None:
 @click.option(
     "-c",
     "--complexity-threshold",
-    type=int,
+    type=click.IntRange(min=0),
     default=10,
     show_default=True,
-    help="Cyclomatic complexity at/above which a file is flagged as a hotspot.",
+    help="Cyclomatic complexity at/above which a file is flagged as a hotspot (must be >= 0).",
 )
 @click.option(
     "--fail-on-hotspot",

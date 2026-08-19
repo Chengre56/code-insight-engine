@@ -1,0 +1,7 @@
+# Locked runtime dependencies for reproducible installs.
+# Regenerate with: pip freeze --exclude-editable > requirements-lock.txt
+# (run inside a clean virtualenv after `pip install -e .`)
+#
+# This complements pyproject.toml's version ranges: pyproject.toml defines
+# what versions are *allowed*, this file pins what is *actually verified*.
+click==8.3.1

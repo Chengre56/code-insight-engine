@@ -45,12 +45,13 @@ dev = [
     "mypy>=1.5.0",
     "ruff>=0.1.0",
     "black>=23.9.0",
+    "pip-audit>=2.7.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/datafactor/code-insight-engine"
-Repository = "https://github.com/datafactor/code-insight-engine"
-Issues = "https://github.com/datafactor/code-insight-engine/issues"
+Homepage = "https://github.com/Chengre56/code-insight-engine"
+Repository = "https://github.com/Chengre56/code-insight-engine"
+Issues = "https://github.com/Chengre56/code-insight-engine/issues"
 
 [project.scripts]
 code-insight = "code_insight.core.cli:cli"

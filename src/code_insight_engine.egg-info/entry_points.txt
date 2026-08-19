@@ -1,0 +1,2 @@
+[console_scripts]
+code-insight = code_insight.core.cli:cli

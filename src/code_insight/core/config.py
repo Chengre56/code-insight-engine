@@ -152,6 +152,26 @@ class AnalysisConfig:
         self.target_path = Path(self.target_path).expanduser().resolve()
         # Normalize language filters to lowercase for case-insensitive matching.
         self.languages = frozenset(lang.lower() for lang in self.languages)
+        self._validate_inputs()
+
+    def _validate_inputs(self) -> None:
+        """Validate user-supplied configuration values before any I/O happens.
+
+        This runs eagerly at construction time (not just before a scan) so
+        malformed input is rejected immediately with a clear error, rather
+        than surfacing confusingly deep in file discovery or reporting.
+
+        Raises:
+            ValueError: If ``complexity_threshold`` is negative, or if any
+                ``exclude_patterns`` entry is empty/whitespace-only.
+        """
+        if self.complexity_threshold < 0:
+            raise ValueError(
+                f"complexity_threshold must be >= 0, got {self.complexity_threshold}"
+            )
+        for pattern in self.exclude_patterns:
+            if not pattern or not pattern.strip():
+                raise ValueError("exclude_patterns entries must be non-empty strings")
 
     def validate(self) -> None:
         """Ensure the target path exists.

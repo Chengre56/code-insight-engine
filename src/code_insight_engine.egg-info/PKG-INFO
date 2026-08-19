@@ -1,3 +1,37 @@
+Metadata-Version: 2.4
+Name: code-insight-engine
+Version: 1.0.0
+Summary: A high-performance, multi-language static analysis engine for code quality metrics.
+Author: DataFactor Engineering
+License: MIT
+Project-URL: Homepage, https://github.com/datafactor/code-insight-engine
+Project-URL: Repository, https://github.com/datafactor/code-insight-engine
+Project-URL: Issues, https://github.com/datafactor/code-insight-engine/issues
+Keywords: static-analysis,code-quality,cyclomatic-complexity,linting,metrics,cli
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: Topic :: Software Development :: Testing
+Classifier: Typing :: Typed
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: click<9.0.0,>=8.1.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: mypy>=1.5.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: black>=23.9.0; extra == "dev"
+Dynamic: license-file
+
 # code-insight-engine
 
 **A high-performance, multi-language static analysis engine for code quality metrics.**
@@ -112,34 +146,17 @@ addition to `LANGUAGE_REGISTRY`.
 Requires Python 3.10+.
 
 ```bash
-git clone https://github.com/Chengre56/code-insight-engine.git
+git clone https://github.com/datafactor/code-insight-engine.git
 cd code-insight-engine
 
 # Editable install for development
 pip install -e .
 
-# ...or with development tooling (pytest, mypy, ruff, black, pip-audit)
+# ...or with development tooling (pytest, mypy, ruff, black)
 pip install -e ".[dev]"
-
-# ...or a fully reproducible install from the pinned lockfile
-pip install -r requirements-lock.txt -e . --no-deps
 ```
 
 This registers the `code-insight` console script on your `PATH`.
-
-### Docker
-
-```bash
-docker build -t code-insight-engine .
-docker run --rm -v "$(pwd)":/workspace code-insight-engine analyze . --format summary
-```
-
-### Dev Container
-
-This repo includes a `.devcontainer/` config — open it in VS Code with the
-[Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-for a one-click, fully-configured environment (Python 3.12, dev dependencies,
-ruff/mypy editor integration pre-installed).
 
 ---
 
@@ -331,10 +348,16 @@ code-insight-engine/
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development setup, coding
-standards, and PR workflow. See [CHANGELOG.md](CHANGELOG.md) for release
-history and [SECURITY.md](SECURITY.md) for the vulnerability disclosure
-process.
+1. Fork the repository and create a feature branch: `git checkout -b feature/my-change`.
+2. Install dev dependencies: `pip install -e ".[dev]"`.
+3. Write tests for any new behavior — coverage must stay at or above 85%.
+4. Ensure the quality gate passes locally: `ruff check src tests && mypy src && pytest`.
+5. Follow the existing docstring style (Google-style, one paragraph summary + `Args`/`Returns`/`Raises`).
+6. Open a pull request describing the change and its motivation.
+
+New language support only requires adding an entry to `LANGUAGE_REGISTRY` in
+`src/code_insight/core/config.py`; the discovery, comment-density, and generic-complexity
+logic apply automatically.
 
 ---
 
